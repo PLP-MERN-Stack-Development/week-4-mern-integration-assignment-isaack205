@@ -1,136 +1,184 @@
-// api.js - API service for making requests to the backend
-
+// Import
 import axios from 'axios';
 
-// Create axios instance with base URL
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+const API = axios.create({
+    baseURL: 'http://localhost:5000/api',
+    headers: { 'Content-Type': 'application/json' }
 });
 
-// Add request interceptor for authentication
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+// Request interceptor for authentication
+API.interceptors.request.use(
+    (config) =>{
+        const token = localStorage.getItem('jwtToken');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`
+        }
+        return config; 
+    },
+    (error) => {
+        return Promise.reject(error)
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
 );
 
-// Add response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Handle authentication errors
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Post API services
-export const postService = {
-  // Get all posts with optional pagination and filters
-  getAllPosts: async (page = 1, limit = 10, category = null) => {
-    let url = `/posts?page=${page}&limit=${limit}`;
-    if (category) {
-      url += `&category=${category}`;
-    }
-    const response = await api.get(url);
-    return response.data;
-  },
-
-  // Get a single post by ID or slug
-  getPost: async (idOrSlug) => {
-    const response = await api.get(`/posts/${idOrSlug}`);
-    return response.data;
-  },
-
-  // Create a new post
-  createPost: async (postData) => {
-    const response = await api.post('/posts', postData);
-    return response.data;
-  },
-
-  // Update an existing post
-  updatePost: async (id, postData) => {
-    const response = await api.put(`/posts/${id}`, postData);
-    return response.data;
-  },
-
-  // Delete a post
-  deletePost: async (id) => {
-    const response = await api.delete(`/posts/${id}`);
-    return response.data;
-  },
-
-  // Add a comment to a post
-  addComment: async (postId, commentData) => {
-    const response = await api.post(`/posts/${postId}/comments`, commentData);
-    return response.data;
-  },
-
-  // Search posts
-  searchPosts: async (query) => {
-    const response = await api.get(`/posts/search?q=${query}`);
-    return response.data;
-  },
-};
-
-// Category API services
-export const categoryService = {
-  // Get all categories
-  getAllCategories: async () => {
-    const response = await api.get('/categories');
-    return response.data;
-  },
-
-  // Create a new category
-  createCategory: async (categoryData) => {
-    const response = await api.post('/categories', categoryData);
-    return response.data;
-  },
-};
-
-// Auth API services
+// Authentication service
 export const authService = {
-  // Register a new user
-  register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    return response.data;
-  },
 
-  // Login user
-  login: async (credentials) => {
-    const response = await api.post('/auth/login', credentials);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+    // Registering user
+    registerUser: async (userData) => {
+        try {
+            const res = await API.post('/user/register', userData)
+            if(res.data.token) {
+                localStorage.setItem('jwtToken', res.data.token),
+                localStorage.setItem('user', JSON.stringify(res.data.user))
+            }
+            return res.data;
+        } catch (error) {
+            console.error('Error registering user:', error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Login user
+    loginUser: async (userData) => {
+        try {
+            const res = await API.post('/user/login', userData);
+            if(res.data.token) {
+                localStorage.setItem('jwtToken', res.data.token),
+                localStorage.setItem('user', JSON.stringify(res.data.user))
+            }
+            return res.data
+        } catch (error) {
+            console.error('Error login in user:', error.response?.data || error.message);
+            throw error; 
+        }
+    },
+
+    // Logout User
+    logoutUser: () => {
+        localStorage.removeItem('jwtToken'),
+        localStorage.removeItem('user')
     }
-    return response.data;
-  },
+}
 
-  // Logout user
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  },
+export const categoryService = {
+    
+    // Create category
+    createCategory: async(categoryData) => {
+        try {
+            const res = await API.post('/category', categoryData);
+            return res.data;
+        } catch (error) {
+            console.error('Error creating category', error.response?.data || error.message);
+            throw error;
+        }
+    },
 
-  // Get current user
-  getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
+    // Get all categories
+    getCategories: async(page = 1, limit = 10) => {
+        try {
+            const url = `/category?page=${page}&limit=${limit}`
+            const res = await API.get(url);
+            return res.data
+        } catch (error) {
+           console.error('Error fetching categories:', error.response?.data || error.message);
+           throw error; 
+        }
+    },
+
+    // Get category by id
+    getCategoryById: async(categoryId) => {
+        try {
+            const res = await API.get(`/category/${categoryId}`);
+            return res.data;
+        } catch (error) {
+            console.error(`Error fetching category with id-${categoryId}`, error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Update by id
+    updateCategory: async(categoryId, updatedCategory) => {
+        try {
+            const res = await API.put(`/category/${categoryId}`, updatedCategory);
+            return res.data;
+        } catch (error) {
+           console.error(`Error updating category with id-${categoryId}`, error.response?.data || error.message);
+           throw error; 
+        }
+    },
+
+    // Delete category by id
+    deleteCategory: async(categoryId) => {
+        try {
+            const res = await API.delete(`/category/${categoryId}`);
+            return res.data;
+        } catch (error) {
+           console.error(`Error deleting category with id-${categoryId}`, error.response?.data || error.message);
+           throw error; 
+        }
+    },
 };
 
-export default api; 
+export const postService = {
+
+    // Create blogPost
+    createPost: async(postData) =>{
+        try {
+            const res = await API.post('/post', postData);
+            return res.data
+        } catch (error) {
+            console.error('Error creating post:', error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Fetch all posts
+    getAllPosts: async(page = 1, limit = 10, category = null) =>{
+        try {
+            let url = `/post?page=${page}&limit=${limit}`;
+            if (category) {
+                url += `&category=${category}`;
+            }
+            const res = await API.get(url);
+            return res.data;
+        } catch (error) {
+            console.error('Error fetching posts', error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Fetch by id
+    getPostById: async(postId) =>{
+        try {
+            const res = await API.get(`/post/${postId}`);
+            return res.data
+        } catch (error) {
+            console.log(`Error fetching post with id-${postId}`, error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Update by id
+    updatePost: async(postId, updatedData) =>{
+        try {
+            const res = await API.put(`/post/${postId}`, updatedData);
+            return res.data
+        } catch (error) {
+            console.error(`Error updating blog post with id-${postId}`, error.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    // Delete post by id
+    deletePost: async(postId) =>{
+        try {
+            const res = await API.delete(`/post/${postId}`);
+            return res.data
+        } catch (error) {
+            console.log(`Error deleting post with id-${postId}`, error.response?.data || error.message);
+            throw error;
+        }
+    }
+};
+
+export default API;
